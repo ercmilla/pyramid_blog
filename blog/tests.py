@@ -6,50 +6,67 @@ from pyramid import testing
 from .models import DBSession
 
 
-class TestMyViewSuccessCondition(unittest.TestCase):
+class TestBlogPages(unittest.TestCase):
     def setUp(self):
-        self.config = testing.setUp()
         from sqlalchemy import create_engine
+        from .models import Base, Blog
+
+        request = testing.DummyRequest()
+        self.config = testing.setUp(request=request)
+
         engine = create_engine('sqlite://')
-        from .models import (
-            Base,
-            MyModel,
-            )
         DBSession.configure(bind=engine)
         Base.metadata.create_all(engine)
         with transaction.manager:
-            model = MyModel(name='one', value=55)
+            model = Blog(title='testing title', body='testing body')
             DBSession.add(model)
 
     def tearDown(self):
         DBSession.remove()
         testing.tearDown()
 
-    def test_passing_view(self):
-        from .views import my_view
+    def _makeOne(self, request):
+        from .views import BlogPages
+        inst = BlogPages(request)
+        return inst
+
+    def test_all_blogs_view(self):
         request = testing.DummyRequest()
-        info = my_view(request)
-        self.assertEqual(info['one'].name, 'one')
-        self.assertEqual(info['project'], 'blog')
+        info = self._makeOne(request)
+        data = info.all_blogs()
+        self.assertIn(data[0]['title'], 'testing title')
 
+    def test_add_blog_view(self):
+        json_object = {'title': 'testing add_blog view', 'body': 'testing add_blog view body'}
+        request = testing.DummyRequest(method='POST', json_body=json_object)
+        info = self._makeOne(request)
+        data = info.add_blog()
+        self.assertEqual(data.status_int, 200)
+        self.assertIn('Successfully added', data.body)
 
-class TestMyViewFailureCondition(unittest.TestCase):
-    def setUp(self):
-        self.config = testing.setUp()
-        from sqlalchemy import create_engine
-        engine = create_engine('sqlite://')
-        from .models import (
-            Base,
-            MyModel,
-            )
-        DBSession.configure(bind=engine)
-
-    def tearDown(self):
-        DBSession.remove()
-        testing.tearDown()
-
-    def test_failing_view(self):
-        from .views import my_view
+    def test_one_blog_view(self):
         request = testing.DummyRequest()
-        info = my_view(request)
-        self.assertEqual(info.status_int, 500)
+        request.matchdict['id'] = 1
+        info = self._makeOne(request)
+        data = info.one_blog()
+        self.assertIn(data[0]['title'], 'testing title')
+
+    def test_update_blog_view(self):
+        json_object = {'title': 'testing update', 'body': 'testing update body'}
+        request = testing.DummyRequest(method='PUT', json_body=json_object)
+        request.matchdict['id'] = 1
+        info = self._makeOne(request)
+        data = info.update_blog()
+        self.assertEqual(data.status_int, 200)
+        self.assertIn('Successfully Updated', data.body)
+
+    def test_delete_blog_view(self):
+        from .models import Blog
+        json_object = {'title': 'testing update', 'body': 'testing update body'}
+        request = testing.DummyRequest(method='DELETE', json_body=json_object)
+        request.matchdict['id'] = 1
+        info = self._makeOne(request)
+        data = info.delete_blog()
+        query = DBSession.query(Blog).filter_by(id=request.matchdict['id']).first()
+        self.assertIn('Successfully Deleted', data.body)
+        self.assertEqual(query, None)

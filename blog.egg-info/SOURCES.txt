@@ -13,6 +13,7 @@ blog.egg-info/SOURCES.txt
 blog.egg-info/dependency_links.txt
 blog.egg-info/entry_points.txt
 blog.egg-info/not-zip-safe
+blog.egg-info/pbr.json
 blog.egg-info/requires.txt
 blog.egg-info/top_level.txt
 blog/scripts/__init__.py
